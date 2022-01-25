@@ -160,6 +160,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
             val URL = getDirectionURL(startPoint, endPoint)
 
             GetDirection(URL).execute()
+            binding.showNavigationButton.visibility = View.VISIBLE
+            binding.showNavigationButton.setOnClickListener {
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("http://maps.google.com/maps?saddr=${startPoint.latitude},${startPoint.longitude}&daddr=${endPoint.latitude},${endPoint.longitude}")
+                )
+                startActivity(intent)
+            }
         }
     }
 

@@ -1,14 +1,14 @@
 package com.example.navigationapp
 
 import android.Manifest
-import android.content.Intent
+import android.animation.Animator
+import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
 import android.util.Log
-import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +22,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.JointType.ROUND
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
@@ -38,15 +39,22 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
     private lateinit var binding: ActivityMapsBinding
     private lateinit var permissionLauncher: ActivityResultLauncher<String>
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var myPlace: MarkerOptions
-    private lateinit var targetPlace: MarkerOptions
-    private lateinit var currentPolyline: Polyline
     private lateinit var startPoint: LatLng
     private lateinit var endPoint: LatLng
+    private var firstBluePolyLine: Polyline? = null
+    private var firstRedPolyLine: Polyline? = null
+    private var secondBluePolyLine: Polyline? = null
+    private var secondRedPolyLine: Polyline? = null
+    private var thirdBluePolyLine: Polyline? = null
+    private var thirdRedPolyLine: Polyline? = null
+    private val firstPolylineList = mutableListOf<LatLng>()
+    private val secondPolylineList = mutableListOf<LatLng>()
+    private val thirdPolylineList = mutableListOf<LatLng>()
+    private var isCanDrawable = true
+    private var animationCounter = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -99,10 +107,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
                     // Got last known location. In some rare situations this can be null.
                     if (location != null) {
                         val userLocation = LatLng(location.latitude, location.longitude)
-                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation, 15f))
-                        myPlace = MarkerOptions().position(userLocation).title("my location")
-                        mMap.addMarker(myPlace)
-                        startPoint = userLocation
+                        mMap.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(
+                                userLocation,
+                                15f
+                            )
+                        )
                     }
                 }
         }
@@ -129,16 +139,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
                                 // Got last known location. In some rare situations this can be null.
                                 if (location != null) {
                                     val userLocation = LatLng(location.latitude, location.longitude)
-                                    mMap.moveCamera(
+
+                                    mMap.animateCamera(
                                         CameraUpdateFactory.newLatLngZoom(
                                             userLocation,
                                             15f
                                         )
                                     )
-                                    myPlace =
-                                        MarkerOptions().position(userLocation).title("my location")
-                                    mMap.addMarker(myPlace)
-                                    startPoint = userLocation
                                 }
                             }
                     }
@@ -151,23 +158,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
     }
 
     override fun onMapLongClick(p0: LatLng) {
-        mMap.clear()
-        mMap.addMarker(myPlace)
-        mMap.addMarker(MarkerOptions().position(p0).title("target location"))
-        if (this::myPlace.isInitialized) {
-            targetPlace = MarkerOptions().position(p0).title("target location")
-            endPoint = p0
-            val URL = getDirectionURL(startPoint, endPoint)
-
-            GetDirection(URL).execute()
-            binding.showNavigationButton.visibility = View.VISIBLE
-            binding.showNavigationButton.setOnClickListener {
-                val intent = Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("http://maps.google.com/maps?saddr=${startPoint.latitude},${startPoint.longitude}&daddr=${endPoint.latitude},${endPoint.longitude}")
-                )
-                startActivity(intent)
+        mMap.addMarker(MarkerOptions().position(p0))
+        if (isCanDrawable) {
+            animationCounter++
+            if (animationCounter % 2 == 0) {
+                endPoint = p0
+                val URL = getDirectionURL(startPoint, endPoint)
+                GetDirection(URL).execute()
+                if (animationCounter == 6) {
+                    isCanDrawable = false
+                }
+            } else {
+                startPoint = p0
             }
+        } else {
+            Toast.makeText(this, "You can create max 3 route", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -179,13 +184,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
         }"
     }
 
-    private inner class GetDirection(val url: String) :
+    private inner class GetDirection(
+        val url: String
+    ) :
         AsyncTask<Void, Void, List<List<LatLng>>>() {
         override fun doInBackground(vararg params: Void?): List<List<LatLng>> {
             val client = OkHttpClient()
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
-            println(response)
             val data = response.body()!!.string()
             Log.d("GoogleMap", " data : $data")
             val result = ArrayList<List<LatLng>>()
@@ -203,6 +209,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
                     path.addAll(decodePolyline(respObj.routes[0].legs[0].steps[i].polyline.points))
                 }
                 result.add(path)
+                firstPolylineList
+                when {
+                    animationCounter <= 2 -> {
+                        firstPolylineList.addAll(path)
+                    }
+
+                    animationCounter in 3..4 -> {
+                        secondPolylineList.addAll(path)
+                    }
+
+                    animationCounter in 5..6 -> {
+                        thirdPolylineList.addAll(path)
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -210,14 +230,48 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
         }
 
         override fun onPostExecute(result: List<List<LatLng>>) {
-            val lineoption = PolylineOptions()
+            val blueOptions = PolylineOptions()
+            val redOptions = PolylineOptions()
             for (i in result.indices) {
-                lineoption.addAll(result[i])
-                lineoption.width(10f)
-                lineoption.color(Color.BLUE)
-                lineoption.geodesic(true)
+                blueOptions.apply {
+                    addAll(result[i])
+                    width(10f)
+                    color(Color.BLUE)
+                    geodesic(true)
+                    jointType(ROUND)
+                }
             }
-            mMap.addPolyline(lineoption)
+
+            for (i in result.indices) {
+                redOptions.apply {
+                    addAll(result[i])
+                    width(10f)
+                    color(Color.RED)
+                    geodesic(true)
+                    jointType(ROUND)
+                }
+            }
+            when {
+                animationCounter <= 2 -> {
+                    firstBluePolyLine = mMap.addPolyline(blueOptions)
+                    firstRedPolyLine = mMap.addPolyline(redOptions)
+                    animatePolyLine(firstRedPolyLine!!, firstBluePolyLine!!, firstPolylineList)
+                }
+
+                animationCounter in 3..4 -> {
+                    secondBluePolyLine = mMap.addPolyline(blueOptions)
+                    secondRedPolyLine = mMap.addPolyline(redOptions)
+                    animatePolyLine(secondRedPolyLine!!, secondBluePolyLine!!, secondPolylineList)
+                }
+
+                animationCounter in 5..6 -> {
+                    thirdBluePolyLine = mMap.addPolyline(blueOptions)
+                    thirdRedPolyLine = mMap.addPolyline(redOptions)
+                    animatePolyLine(thirdRedPolyLine!!, thirdBluePolyLine!!, thirdPolylineList)
+                }
+            }
+
+            //animatePolyLine()
         }
     }
 
@@ -234,7 +288,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
             var shift = 0
             var result = 0
             do {
-                b = encoded[index++].toInt() - 63
+                b = encoded[index++].code - 63
                 result = result or (b and 0x1f shl shift)
                 shift += 5
             } while (b >= 0x20)
@@ -244,7 +298,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
             shift = 0
             result = 0
             do {
-                b = encoded[index++].toInt() - 63
+                b = encoded[index++].code - 63
                 result = result or (b and 0x1f shl shift)
                 shift += 5
             } while (b >= 0x20)
@@ -258,6 +312,51 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
         return poly
     }
 
+
+    private fun animatePolyLine(
+        foregroundPolyline: Polyline,
+        backgroundPolyline: Polyline,
+        polylineList: List<LatLng>
+    ) {
+        val animator = ValueAnimator.ofInt(0, 100)
+        animator.duration = 1000
+        animator.interpolator = LinearInterpolator()
+        animator.addUpdateListener { animator ->
+            val latLngList: MutableList<LatLng> = backgroundPolyline.points
+            val initialPointSize = latLngList.size
+            val animatedValue = animator.animatedValue as Int
+            val newPoints: Int = animatedValue * polylineList.size / 100
+            if (initialPointSize < newPoints) {
+                latLngList.addAll(polylineList.subList(initialPointSize, newPoints))
+                backgroundPolyline.points = latLngList
+            }
+        }
+        val polyLineAnimationListener: Animator.AnimatorListener =
+            object : Animator.AnimatorListener {
+                override fun onAnimationStart(animator: Animator) {
+                }
+
+                override fun onAnimationEnd(animator: Animator) {
+                    val blackLatLng: MutableList<LatLng> = backgroundPolyline.points
+                    val greyLatLng: MutableList<LatLng> = foregroundPolyline.points
+                    greyLatLng.clear()
+                    greyLatLng.addAll(blackLatLng)
+                    blackLatLng.clear()
+                    backgroundPolyline.points = blackLatLng
+                    foregroundPolyline.points = greyLatLng
+                    backgroundPolyline.zIndex = 2f
+                    animator.start()
+                }
+
+                override fun onAnimationCancel(animator: Animator) {}
+                override fun onAnimationRepeat(animator: Animator) {}
+            }
+        animator.addListener(polyLineAnimationListener)
+        animator.start()
+    }
+
+
 }
+
 
 

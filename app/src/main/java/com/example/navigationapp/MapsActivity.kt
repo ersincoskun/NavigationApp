@@ -161,18 +161,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
         if (isCanDrawable) {
             mMap.addMarker(MarkerOptions().position(p0))
             animationCounter++
-            if (animationCounter % 2 == 0) {
+            if (animationCounter > 2) {
+                startPoint=endPoint
                 endPoint = p0
                 val URL = getDirectionURL(startPoint, endPoint)
                 GetDirection(URL).execute()
                 if (animationCounter == 6) {
                     isCanDrawable = false
                 }
-            } else {
+            } else if (animationCounter == 1) {
                 startPoint = p0
+            } else {
+                endPoint=p0
+                val URL = getDirectionURL(startPoint, endPoint)
+                GetDirection(URL).execute()
             }
         } else {
-            Toast.makeText(this, "You can create max 3 route", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "You can create max 6 mark", Toast.LENGTH_LONG).show()
         }
     }
 

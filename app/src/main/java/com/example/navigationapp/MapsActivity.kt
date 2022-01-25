@@ -158,8 +158,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
     }
 
     override fun onMapLongClick(p0: LatLng) {
-        mMap.addMarker(MarkerOptions().position(p0))
         if (isCanDrawable) {
+            mMap.addMarker(MarkerOptions().position(p0))
             animationCounter++
             if (animationCounter % 2 == 0) {
                 endPoint = p0
@@ -321,10 +321,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapLon
         val animator = ValueAnimator.ofInt(0, 100)
         animator.duration = 1000
         animator.interpolator = LinearInterpolator()
-        animator.addUpdateListener { animator ->
+        animator.addUpdateListener { paramAnimator ->
             val latLngList: MutableList<LatLng> = backgroundPolyline.points
             val initialPointSize = latLngList.size
-            val animatedValue = animator.animatedValue as Int
+            val animatedValue = paramAnimator.animatedValue as Int
             val newPoints: Int = animatedValue * polylineList.size / 100
             if (initialPointSize < newPoints) {
                 latLngList.addAll(polylineList.subList(initialPointSize, newPoints))

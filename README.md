@@ -1,1 +1,1 @@
-This application marks points and draws animated lines between points
+This application marks points on the map and draws animated lines between points
